@@ -43,6 +43,8 @@ The resulting item-level outputs include:
 - an **intensity score**
 - per-feature contribution summaries
 
+The scorer now also writes outputs to disk instead of only printing them.
+
 ---
 
 ## Core Concepts
@@ -278,6 +280,17 @@ Main methods:
 - `score_mentions(target_df)`
 - `score_items(target_df)`
 
+### `save_scoring_outputs(...)`
+
+Writes scorer outputs to disk.
+
+Files written:
+
+- `item_scores.csv`
+- `mention_scores.csv`
+- `feature_weights.csv`
+- `scoring_config.json`
+
 ---
 
 ## Example Usage
@@ -324,30 +337,66 @@ background_df = pd.read_csv("background_mentions.csv")
 scorer.fit(background_df)
 ```
 
-### 4. Inspect learned weights
-
-```python
-weights_df = scorer.export_feature_weights()
-print(weights_df.head(20))
-```
-
-### 5. Score target items
+### 4. Score target items
 
 ```python
 target_df = pd.read_csv("mentions.csv")
 item_scores_df, mention_scores_df = scorer.score_items(target_df)
+```
 
-print(item_scores_df.head())
-print(mention_scores_df.head())
+### 5. Save outputs
+
+```python
+save_scoring_outputs(
+    scorer=scorer,
+    item_scores_df=item_scores_df,
+    mention_scores_df=mention_scores_df,
+    output_dir="scoring_outputs",
+    save_weights=True,
+    save_config=True,
+)
 ```
 
 ---
 
-## Output Tables
+## Output Files
 
-### Feature weights table
+The scorer can now save four output files.
 
-The learned weights table typically contains:
+### 1. `item_scores.csv`
+
+Contains one row per item.
+
+Typical columns:
+
+- `item_id`
+- `num_mentions`
+- `raw_score`
+- `normalized_score`
+- `final_score`
+- `intensity_score`
+- `feature_contributions_json`
+
+### 2. `mention_scores.csv`
+
+Contains one row per mention.
+
+Typical columns:
+
+- `item_id`
+- `mention_id`
+- `gender`
+- `mention_reliability`
+- `mention_score_raw`
+- `mention_abs_score`
+- `mention_evidence_total`
+- `contributions_json`
+
+### 3. `feature_weights.csv`
+
+Contains one row per feature-value pair learned from the background corpus.
+
+Typical columns:
 
 - `feature`
 - `value`
@@ -360,29 +409,35 @@ The learned weights table typically contains:
 - `shrunk_weight`
 - `reliability`
 
-### Mention scores table
+### 4. `scoring_config.json`
 
-The mention-level scoring output typically contains:
+Contains the saved scorer configuration and feature specification metadata.
 
-- `item_id`
-- `mention_id`
-- `gender`
-- `mention_score_raw`
-- `mention_abs_score`
-- `mention_evidence_total`
-- `contributions_json`
+This is useful for reproducibility and record keeping.
 
-### Item scores table
+---
 
-The item-level scoring output typically contains:
+## Recommended Output Directory Structure
 
-- `item_id`
-- `num_mentions`
-- `raw_score`
-- `normalized_score`
-- `final_score`
-- `intensity_score`
-- `feature_contributions_json`
+```text
+scoring_outputs/
+├── item_scores.csv
+├── mention_scores.csv
+├── feature_weights.csv
+└── scoring_config.json
+```
+
+If you want separate outputs per run, you can create a timestamped output directory.
+
+Example:
+
+```python
+from datetime import datetime
+from pathlib import Path
+
+timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+output_dir = Path(f"scoring_outputs_{timestamp}")
+```
 
 ---
 
@@ -518,8 +573,9 @@ If you are using the full scorer implementation discussed in the project, also e
 4. define the feature list
 5. fit the scorer on the background file
 6. score the target items
-7. inspect item-level and mention-level outputs
-8. analyze top contributing features
+7. save scorer outputs to disk
+8. inspect item-level and mention-level outputs
+9. analyze top contributing features
 
 ---
 
@@ -579,10 +635,11 @@ project/
 ├── scorer.py
 ├── background_mentions.csv
 ├── mentions.csv
-└── outputs/
+└── scoring_outputs/
     ├── item_scores.csv
     ├── mention_scores.csv
-    └── feature_weights.csv
+    ├── feature_weights.csv
+    └── scoring_config.json
 ```
 
 ---
@@ -598,4 +655,5 @@ It is designed to:
 - handle arbitrary extracted features
 - support reliability weighting and shrinkage
 - produce both directional and intensity-based scores
+- save outputs directly to files
 - work directly with scorer-ready mention outputs from the extraction pipeline
