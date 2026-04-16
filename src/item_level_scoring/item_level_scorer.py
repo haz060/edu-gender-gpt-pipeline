@@ -8,6 +8,10 @@ import json
 import pandas as pd
 import numpy as np
 
+from pathlib import Path
+import json
+
+
 
 # ============================================================
 # Configuration
@@ -85,6 +89,74 @@ class ScoringConfig:
 # ============================================================
 # Utilities
 # ============================================================
+
+def save_scoring_outputs(
+    scorer,
+    item_scores_df,
+    mention_scores_df,
+    output_dir: str | Path,
+    save_weights: bool = True,
+    save_config: bool = True,
+) -> None:
+    """
+    Save scorer outputs to disk.
+
+    Files written:
+      - item_scores.csv
+      - mention_scores.csv
+      - feature_weights.csv (optional)
+      - scoring_config.json (optional)
+    """
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    item_scores_path = output_dir / "item_scores.csv"
+    mention_scores_path = output_dir / "mention_scores.csv"
+    weights_path = output_dir / "feature_weights.csv"
+    config_path = output_dir / "scoring_config.json"
+
+    item_scores_df.to_csv(item_scores_path, index=False)
+    mention_scores_df.to_csv(mention_scores_path, index=False)
+
+    if save_weights:
+        weights_df = scorer.export_feature_weights()
+        weights_df.to_csv(weights_path, index=False)
+
+    if save_config:
+        config_dict = {
+            "gender_col": scorer.config.gender_col,
+            "item_id_col": scorer.config.item_id_col,
+            "mention_id_col": scorer.config.mention_id_col,
+            "mention_reliability_col": scorer.config.mention_reliability_col,
+            "alpha": scorer.config.alpha,
+            "shrink_k": scorer.config.shrink_k,
+            "epsilon": scorer.config.epsilon,
+            "use_tanh": scorer.config.use_tanh,
+            "tanh_gamma": scorer.config.tanh_gamma,
+            "use_evidence_normalization": scorer.config.use_evidence_normalization,
+            "drop_unknown_gender": scorer.config.drop_unknown_gender,
+            "feature_specs": [
+                {
+                    "name": fs.name,
+                    "feature_type": fs.feature_type,
+                    "active_values": fs.active_values,
+                    "missing_values": fs.missing_values,
+                    "reliability": fs.reliability,
+                    "min_support": fs.min_support,
+                    "normalize_strings": fs.normalize_strings,
+                }
+                for fs in scorer.feature_specs.values()
+            ],
+        }
+        with open(config_path, "w", encoding="utf-8") as f:
+            json.dump(config_dict, f, ensure_ascii=False, indent=2)
+
+    print(f"Saved item scores: {item_scores_path}")
+    print(f"Saved mention scores: {mention_scores_path}")
+    if save_weights:
+        print(f"Saved feature weights: {weights_path}")
+    if save_config:
+        print(f"Saved scoring config: {config_path}")
 
 def _is_missing(x: Any, missing_values: List[Any]) -> bool:
     if pd.isna(x):
@@ -489,3 +561,6 @@ class BiasScorer:
 
         item_scores = pd.DataFrame(item_rows).sort_values(self.config.item_id_col).reset_index(drop=True)
         return item_scores, mention_scores
+
+
+
